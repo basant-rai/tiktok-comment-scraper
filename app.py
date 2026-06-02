@@ -1,14 +1,18 @@
 import asyncio
 import logging
 import os
-from flask import Flask, render_template, request, jsonify, send_file
+from datetime import datetime
+from typing import Optional
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+import aiofiles
+
 from scraper import TikTokCommentScraper
 from exporter import DataExporter
 from config import Config
-from datetime import datetime
-
-app = Flask(__name__)
-app.config.update(Config.__dict__)
 
 os.makedirs(Config.LOGS_DIR, exist_ok=True)
 os.makedirs(Config.OUTPUT_DIR, exist_ok=True)
@@ -23,8 +27,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-exporter = DataExporter(Config.OUTPUT_DIR)
+app = FastAPI(
+    title="TikTok Comment Scraper API",
+    description="Scrape and analyze comments from TikTok videos",
+    version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 scraper = TikTokCommentScraper(headless=True)
+exporter = DataExporter(Config.OUTPUT_DIR)
+
+templates_dir = os.path.join(os.path.dirname(__file__), "templates")
 
 scraping_status = {
     "is_running": False,
@@ -35,42 +55,82 @@ scraping_status = {
 }
 
 
-@app.route("/")
-def index():
-    return render_template("index.html")
+class ScrapeRequest(BaseModel):
+    video_url: str = Field(..., description="TikTok video URL")
+    max_comments: int = Field(200, ge=1, le=10000, description="Maximum comments to scrape")
+    export_format: str = Field("json", description="Export format: json, csv, or excel")
 
 
-@app.route("/api/scrape", methods=["POST"])
-def api_scrape():
+class ValidateURLRequest(BaseModel):
+    url: str = Field(..., description="TikTok URL to validate")
+
+
+class FileInfo(BaseModel):
+    name: str
+    size: int
+    modified: str
+
+
+class ExportSummary(BaseModel):
+    total_comments: int
+    total_likes: int = 0
+    total_replies: int = 0
+    avg_likes: float = 0.0
+    avg_replies: float = 0.0
+    verified_users: int = 0
+
+
+class ScrapeResponse(BaseModel):
+    success: bool
+    metadata: dict
+    summary: ExportSummary
+    export_file: str
+    total_comments: int
+
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
     try:
-        data = request.get_json()
-        video_url = data.get("video_url", "").strip()
-        max_comments = int(data.get("max_comments", 200))
-        export_format = data.get("export_format", "json")
+        html_path = os.path.join(templates_dir, "index.html")
+        with open(html_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return """
+        <html>
+            <body>
+                <h1>TikTok Comment Scraper</h1>
+                <p>API running successfully!</p>
+                <p><a href="/docs">API Documentation</a></p>
+            </body>
+        </html>
+        """
+
+
+@app.post("/api/scrape", response_model=ScrapeResponse)
+async def api_scrape(request: ScrapeRequest):
+    try:
+        video_url = request.video_url.strip()
+        max_comments = request.max_comments
+        export_format = request.export_format
 
         if not video_url:
-            return jsonify({"error": "Video URL is required"}), 400
+            raise HTTPException(status_code=400, detail="Video URL is required")
 
         if not scraper.validate_url(video_url):
-            return jsonify({"error": "Invalid TikTok URL format"}), 400
-
-        if max_comments < 1 or max_comments > 10000:
-            return jsonify({"error": "Max comments must be between 1 and 10000"}), 400
+            raise HTTPException(status_code=400, detail="Invalid TikTok URL format")
 
         if export_format not in Config.EXPORT_FORMATS:
-            return jsonify({"error": f"Export format must be one of {Config.EXPORT_FORMATS}"}), 400
+            raise HTTPException(
+                status_code=400,
+                detail=f"Export format must be one of {Config.EXPORT_FORMATS}"
+            )
 
         scraping_status["is_running"] = True
         scraping_status["current_url"] = video_url
         scraping_status["error"] = None
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
         try:
-            comments, metadata = loop.run_until_complete(
-                scraper.scrape_comments(video_url, max_comments)
-            )
+            comments, metadata = await scraper.scrape_comments(video_url, max_comments)
 
             if export_format == "json":
                 export_path = exporter.to_json(comments)
@@ -79,104 +139,111 @@ def api_scrape():
             elif export_format == "excel":
                 export_path = exporter.to_excel(comments)
 
-            summary = exporter.get_export_summary(comments)
+            summary_data = exporter.get_export_summary(comments)
+            summary = ExportSummary(**summary_data)
 
             scraping_status["is_running"] = False
 
-            return jsonify({
-                "success": True,
-                "metadata": metadata,
-                "summary": summary,
-                "export_file": os.path.basename(export_path),
-                "total_comments": len(comments),
-            }), 200
+            return ScrapeResponse(
+                success=True,
+                metadata=metadata,
+                summary=summary,
+                export_file=os.path.basename(export_path),
+                total_comments=len(comments)
+            )
 
         except Exception as e:
             scraping_status["is_running"] = False
             scraping_status["error"] = str(e)
             logger.error(f"Scraping error: {e}")
-            return jsonify({"error": str(e)}), 500
+            raise HTTPException(status_code=500, detail=str(e))
 
-        finally:
-            loop.close()
-
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"API error: {e}")
-        return jsonify({"error": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.route("/api/status", methods=["GET"])
-def api_status():
-    return jsonify(scraping_status), 200
+@app.get("/api/status")
+async def api_status():
+    return scraping_status
 
 
-@app.route("/api/download/<filename>", methods=["GET"])
-def api_download(filename):
-    try:
-        filepath = os.path.join(Config.OUTPUT_DIR, filename)
-
-        if not os.path.exists(filepath):
-            return jsonify({"error": "File not found"}), 404
-
-        return send_file(
-            filepath,
-            as_attachment=True,
-            download_name=filename
-        )
-    except Exception as e:
-        logger.error(f"Download error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/exports", methods=["GET"])
-def api_list_exports():
+@app.get("/api/exports")
+async def api_list_exports():
     try:
         files = []
         if os.path.exists(Config.OUTPUT_DIR):
             for filename in sorted(os.listdir(Config.OUTPUT_DIR), reverse=True):
                 filepath = os.path.join(Config.OUTPUT_DIR, filename)
                 if os.path.isfile(filepath):
-                    files.append({
-                        "name": filename,
-                        "size": os.path.getsize(filepath),
-                        "modified": datetime.fromtimestamp(os.path.getmtime(filepath)).isoformat(),
-                    })
-        return jsonify({"files": files}), 200
+                    files.append(FileInfo(
+                        name=filename,
+                        size=os.path.getsize(filepath),
+                        modified=datetime.fromtimestamp(os.path.getmtime(filepath)).isoformat()
+                    ))
+        return {"files": files}
     except Exception as e:
         logger.error(f"Export list error: {e}")
-        return jsonify({"error": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.route("/api/validate-url", methods=["POST"])
-def api_validate_url():
+@app.get("/api/download/{filename}")
+async def api_download(filename: str):
     try:
-        data = request.get_json()
-        url = data.get("url", "").strip()
+        filepath = os.path.join(Config.OUTPUT_DIR, filename)
+
+        if not os.path.exists(filepath):
+            raise HTTPException(status_code=404, detail="File not found")
+
+        if not os.path.isfile(filepath):
+            raise HTTPException(status_code=400, detail="Invalid file path")
+
+        return FileResponse(
+            path=filepath,
+            filename=filename,
+            media_type="application/octet-stream"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Download error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/validate-url")
+async def api_validate_url(request: ValidateURLRequest):
+    try:
+        url = request.url.strip()
 
         is_valid = scraper.validate_url(url)
         video_id = scraper.extract_video_id(url) if is_valid else None
 
-        return jsonify({
+        return {
             "valid": is_valid,
             "video_id": video_id,
             "message": "Valid TikTok URL" if is_valid else "Invalid TikTok URL format"
-        }), 200
+        }
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({"error": "Endpoint not found"}), 404
-
-
-@app.errorhandler(500)
-def server_error(error):
-    logger.error(f"Server error: {error}")
-    return jsonify({"error": "Internal server error"}), 500
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    return {
+        "error": exc.detail,
+        "status_code": exc.status_code
+    }
 
 
 if __name__ == "__main__":
-    logger.info("Starting TikTok Comment Scraper")
-    app.run(host=Config.HOST, port=Config.PORT, debug=Config.DEBUG)
+    import uvicorn
+    logger.info("Starting TikTok Comment Scraper with FastAPI")
+    uvicorn.run(
+        "app:app",
+        host=Config.HOST,
+        port=Config.PORT,
+        reload=Config.DEBUG
+    )

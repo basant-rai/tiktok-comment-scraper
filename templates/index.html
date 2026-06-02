@@ -1,10 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TikTok Comment Scraper</title>
     <style>
+        :root {
+            --bg-main: #0b0e14;
+            --bg-card: #161b26;
+            --bg-input: #1f2635;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent-tiktok: #fe2c55;
+            --accent-cyan: #25f4ee;
+            --accent-purple: #7928ca;
+            --success: #10b981;
+            --error: #ef4444;
+            --border: #2d3748;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,360 +27,410 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
             min-height: 100vh;
-            padding: 20px;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
         }
 
         .container {
-            max-width: 900px;
-            margin: 0 auto;
+            width: 100%;
+            max-width: 1100px;
         }
 
+        /* Header Style */
         .header {
             text-align: center;
-            color: white;
-            margin-bottom: 30px;
+            margin-bottom: 40px;
         }
 
         .header h1 {
-            font-size: 2.5em;
+            font-size: 2.8em;
+            font-weight: 800;
+            letter-spacing: -1px;
             margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            background: linear-gradient(to right, var(--accent-cyan), var(--accent-tiktok));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .header p {
+            color: var(--text-muted);
             font-size: 1.1em;
-            opacity: 0.9;
         }
 
+        /* Dashboard Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Card Component */
         .card {
-            background: white;
-            border-radius: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
             padding: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
 
+        .card-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+        }
+
+        /* Form elements */
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
 
         label {
             display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        input[type="text"],
-        input[type="number"],
-        select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
-            font-size: 1em;
-            transition: border-color 0.3s;
-        }
-
-        input[type="text"]:focus,
-        input[type="number"]:focus,
-        select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        button {
-            flex: 1;
-            min-width: 120px;
-            padding: 12px 20px;
-            border: none;
-            border-radius: 6px;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
-        }
-
-        .btn-secondary:hover:not(:disabled) {
-            background: #e0e0e0;
-        }
-
-        .url-status {
-            margin-top: 10px;
-            padding: 10px;
-            border-radius: 6px;
-            display: none;
-            font-size: 0.9em;
-        }
-
-        .url-status.valid {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-            display: block;
-        }
-
-        .url-status.invalid {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-            display: block;
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 20px;
-        }
-
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .results {
-            display: none;
-        }
-
-        .result-card {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            border-left: 4px solid #667eea;
-        }
-
-        .result-card h3 {
             margin-bottom: 10px;
-            color: #333;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
-        }
-
-        .stat-box {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-            border: 1px solid #e0e0e0;
-        }
-
-        .stat-box .label {
             font-size: 0.9em;
-            color: #666;
-            margin-bottom: 5px;
-        }
-
-        .stat-box .value {
-            font-size: 1.8em;
-            font-weight: bold;
-            color: #667eea;
-        }
-
-        .export-files {
-            margin-top: 20px;
-        }
-
-        .file-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .file-item {
-            background: white;
-            padding: 12px;
-            border: 1px solid #e0e0e0;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .file-item .info {
-            flex: 1;
-        }
-
-        .file-item .name {
             font-weight: 600;
-            color: #333;
-        }
-
-        .file-item .size {
-            font-size: 0.85em;
-            color: #999;
-        }
-
-        .error-message {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 6px;
-            border: 1px solid #f5c6cb;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .success-message {
-            background: #d4edda;
-            color: #155724;
-            padding: 15px;
-            border-radius: 6px;
-            border: 1px solid #c3e6cb;
-            margin-bottom: 20px;
-            display: none;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .input-wrapper {
             position: relative;
         }
 
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 14px 16px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: white;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 3px rgba(37, 244, 238, 0.15);
+        }
+
         .validation-icon {
             position: absolute;
-            right: 12px;
-            top: 38px;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-weight: bold;
             font-size: 1.2em;
         }
 
-        @media (max-width: 600px) {
-            .header h1 {
-                font-size: 1.8em;
+        /* Buttons */
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-tiktok), var(--accent-purple));
+            color: white;
+            flex: 2;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(254, 44, 85, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #2a3447;
+            color: white;
+            flex: 1;
+        }
+
+        .btn-secondary:hover {
+            background: #36435c;
+        }
+
+        /* Feedback Messages */
+        .error-message,
+        .success-message,
+        .url-status {
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+            display: none;
+            font-weight: 500;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .success-message {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .url-status {
+            margin-top: 10px;
+            margin-bottom: 0;
+        }
+
+        .url-status.valid {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            display: block;
+        }
+
+        .url-status.invalid {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            display: block;
+        }
+
+        /* Loading Spinner */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+            background: var(--bg-card);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+        }
+
+        .spinner {
+            border: 4px solid var(--bg-input);
+            border-top: 4px solid var(--accent-cyan);
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        #loadingStatus {
+            color: var(--text-muted);
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
             }
 
-            .stats-grid {
-                grid-template-columns: 1fr;
+            100% {
+                transform: rotate(360deg);
             }
+        }
 
-            .button-group {
-                flex-direction: column;
-            }
+        /* Results & Dashboard Layout */
+        .results-pane {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .results {
+            display: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .stat-box {
+            background: var(--bg-input);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            transition: transform 0.3s;
+        }
+
+        .stat-box:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-box .label {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .stat-box .value {
+            font-size: 1.8em;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        /* File List Styles */
+        .file-list {
+            max-height: 240px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .file-item {
+            background: var(--bg-input);
+            padding: 14px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item .name {
+            font-weight: 600;
+            color: #fff;
+            font-size: 0.95em;
+            margin-bottom: 3px;
+        }
+
+        .file-item .size {
+            font-size: 0.8em;
+            color: var(--text-muted);
+        }
+
+        .file-item button {
+            padding: 8px 14px;
+            font-size: 0.85em;
+        }
+
+        /* Scrollbar customization */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-main);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
             <h1>🎵 TikTok Comment Scraper</h1>
-            <p>Extract and analyze comments from TikTok videos</p>
+            <p>Extract and analyze audience insights effortlessly</p>
         </div>
 
-        <div class="card">
-            <div class="error-message" id="errorMessage"></div>
-            <div class="success-message" id="successMessage"></div>
+        <div class="dashboard-grid">
+            <div class="card">
+                <div class="card-title">⚙️ Configuration</div>
+                <div class="error-message" id="errorMessage"></div>
+                <div class="success-message" id="successMessage"></div>
 
-            <form id="scraperForm">
-                <div class="form-group">
-                    <label for="videoUrl">TikTok Video URL</label>
-                    <div class="input-wrapper">
-                        <input
-                            type="text"
-                            id="videoUrl"
-                            placeholder="https://www.tiktok.com/@username/video/123456789"
-                            required
-                        />
-                        <span class="validation-icon" id="validationIcon"></span>
+                <form id="scraperForm">
+                    <div class="form-group">
+                        <label for="videoUrl">TikTok Video URL</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="videoUrl" placeholder="https://www.tiktok.com/@username/video/..."
+                                required />
+                            <span class="validation-icon" id="validationIcon"></span>
+                        </div>
+                        <div class="url-status" id="urlStatus"></div>
                     </div>
-                    <div class="url-status" id="urlStatus"></div>
-                </div>
 
-                <div class="form-group">
-                    <label for="maxComments">Maximum Comments to Scrape</label>
-                    <input
-                        type="number"
-                        id="maxComments"
-                        min="1"
-                        max="10000"
-                        value="200"
-                        required
-                    />
-                </div>
+                    <div class="form-group">
+                        <label for="maxComments">Maximum Target Comments</label>
+                        <input type="number" id="maxComments" min="1" max="10000" value="200" required />
+                    </div>
 
-                <div class="form-group">
-                    <label for="exportFormat">Export Format</label>
-                    <select id="exportFormat" required>
-                        <option value="json">JSON</option>
-                        <option value="csv">CSV</option>
-                        <option value="excel">Excel (XLSX)</option>
-                    </select>
-                </div>
+                    <div class="form-group">
+                        <label for="exportFormat">Preferred Export Format</label>
+                        <select id="exportFormat" required>
+                            <option value="json">JSON (Structured Data)</option>
+                            <option value="csv">CSV (Spreadsheet/Excel)</option>
+                            <option value="excel">Excel Dashboard (XLSX)</option>
+                        </select>
+                    </div>
 
-                <div class="button-group">
-                    <button type="submit" class="btn-primary" id="scrapeBtn">
-                        Start Scraping
-                    </button>
-                    <button type="reset" class="btn-secondary">
-                        Clear Form
-                    </button>
-                </div>
-            </form>
-
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <p>Scraping comments from TikTok...</p>
-                <p id="loadingStatus">Initializing...</p>
+                    <div class="button-group">
+                        <button type="submit" class="btn-primary" id="scrapeBtn">
+                            Start Extracting
+                        </button>
+                        <button type="reset" class="btn-secondary">
+                            Clear
+                        </button>
+                    </div>
+                </form>
             </div>
 
-            <div class="results" id="results">
-                <h2>✨ Scraping Results</h2>
-
-                <div class="result-card">
-                    <h3>Statistics</h3>
-                    <div class="stats-grid" id="statsGrid"></div>
+            <div class="results-pane">
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <h3>Scraping Active</h3>
+                    <p id="loadingStatus">Initializing crawler hooks...</p>
                 </div>
 
-                <div class="result-card" id="exportSection">
-                    <h3>📥 Download Results</h3>
-                    <button type="button" class="btn-primary" id="downloadBtn" style="width: 100%;">
-                        Download File
-                    </button>
+                <div class="results" id="results">
+                    <div class="card" style="margin-bottom: 24px;">
+                        <div class="card-title">📊 Analytics Overview</div>
+                        <div class="stats-grid" id="statsGrid"></div>
+
+                        <div id="exportSection"
+                            style="margin-top: 25px; border-top: 1px solid var(--border); padding-top: 20px;">
+                            <button type="button" class="btn-primary" id="downloadBtn" style="width: 100%;">
+                                📥 Download Captured Data
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="export-files">
-                    <h3>📂 Recent Exports</h3>
+                <div class="card">
+                    <div class="card-title">📂 Capture History</div>
                     <div class="file-list" id="fileList"></div>
                 </div>
             </div>
@@ -414,13 +479,13 @@
                     urlStatus.classList.add("valid");
                     urlStatus.textContent = "✓ " + data.message;
                     validationIcon.textContent = "✓";
-                    validationIcon.style.color = "#28a745";
+                    validationIcon.style.color = var(--success);
                 } else {
                     urlStatus.classList.remove("valid");
                     urlStatus.classList.add("invalid");
                     urlStatus.textContent = "✗ " + data.message;
                     validationIcon.textContent = "✗";
-                    validationIcon.style.color = "#dc3545";
+                    validationIcon.style.color = var(--error);
                 }
             } catch (error) {
                 console.error("Validation error:", error);
@@ -565,4 +630,5 @@
         loadExports();
     </script>
 </body>
+
 </html>

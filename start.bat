@@ -23,12 +23,13 @@ if not exist "logs" mkdir logs
 
 REM Start the application
 echo.
-echo ✅ Starting TikTok Comment Scraper...
+echo ✅ Starting TikTok Comment Scraper with FastAPI...
 echo 🌐 Open browser to: http://localhost:5000
+echo 📚 API Docs: http://localhost:5000/docs
 echo.
 echo Press Ctrl+C to stop the server
 echo ==========================================
 echo.
 
-python app.py
+uvicorn app:app --host 127.0.0.1 --port 5000 --reload
 pause
