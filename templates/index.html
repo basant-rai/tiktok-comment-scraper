@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Comment Scraper</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #e0e0e0;
+        }
+
+        .url-status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            display: none;
+            font-size: 0.9em;
+        }
+
+        .url-status.valid {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .url-status.invalid {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-card h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #e0e0e0;
+        }
+
+        .stat-box .label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .stat-box .value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .export-files {
+            margin-top: 20px;
+        }
+
+        .file-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            background: white;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item .info {
+            flex: 1;
+        }
+
+        .file-item .name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .file-item .size {
+            font-size: 0.85em;
+            color: #999;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #f5c6cb;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #c3e6cb;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .validation-icon {
+            position: absolute;
+            right: 12px;
+            top: 38px;
+            font-size: 1.2em;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 TikTok Comment Scraper</h1>
+            <p>Extract and analyze comments from TikTok videos</p>
+        </div>
+
+        <div class="card">
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+
+            <form id="scraperForm">
+                <div class="form-group">
+                    <label for="videoUrl">TikTok Video URL</label>
+                    <div class="input-wrapper">
+                        <input
+                            type="text"
+                            id="videoUrl"
+                            placeholder="https://www.tiktok.com/@username/video/123456789"
+                            required
+                        />
+                        <span class="validation-icon" id="validationIcon"></span>
+                    </div>
+                    <div class="url-status" id="urlStatus"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="maxComments">Maximum Comments to Scrape</label>
+                    <input
+                        type="number"
+                        id="maxComments"
+                        min="1"
+                        max="10000"
+                        value="200"
+                        required
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="exportFormat">Export Format</label>
+                    <select id="exportFormat" required>
+                        <option value="json">JSON</option>
+                        <option value="csv">CSV</option>
+                        <option value="excel">Excel (XLSX)</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button type="submit" class="btn-primary" id="scrapeBtn">
+                        Start Scraping
+                    </button>
+                    <button type="reset" class="btn-secondary">
+                        Clear Form
+                    </button>
+                </div>
+            </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Scraping comments from TikTok...</p>
+                <p id="loadingStatus">Initializing...</p>
+            </div>
+
+            <div class="results" id="results">
+                <h2>✨ Scraping Results</h2>
+
+                <div class="result-card">
+                    <h3>Statistics</h3>
+                    <div class="stats-grid" id="statsGrid"></div>
+                </div>
+
+                <div class="result-card" id="exportSection">
+                    <h3>📥 Download Results</h3>
+                    <button type="button" class="btn-primary" id="downloadBtn" style="width: 100%;">
+                        Download File
+                    </button>
+                </div>
+
+                <div class="export-files">
+                    <h3>📂 Recent Exports</h3>
+                    <div class="file-list" id="fileList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById("scraperForm");
+        const videoUrlInput = document.getElementById("videoUrl");
+        const maxCommentsInput = document.getElementById("maxComments");
+        const exportFormatSelect = document.getElementById("exportFormat");
+        const scrapeBtn = document.getElementById("scrapeBtn");
+        const loading = document.getElementById("loading");
+        const results = document.getElementById("results");
+        const errorMessage = document.getElementById("errorMessage");
+        const successMessage = document.getElementById("successMessage");
+        const urlStatus = document.getElementById("urlStatus");
+        const validationIcon = document.getElementById("validationIcon");
+        const statsGrid = document.getElementById("statsGrid");
+        const downloadBtn = document.getElementById("downloadBtn");
+        const fileList = document.getElementById("fileList");
+        let lastExportFile = null;
+
+        videoUrlInput.addEventListener("blur", validateUrl);
+        videoUrlInput.addEventListener("input", validateUrl);
+
+        async function validateUrl() {
+            const url = videoUrlInput.value.trim();
+            if (!url) {
+                urlStatus.classList.remove("valid", "invalid");
+                validationIcon.textContent = "";
+                return;
+            }
+
+            try {
+                const response = await fetch("/api/validate-url", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url })
+                });
+
+                const data = await response.json();
+
+                if (data.valid) {
+                    urlStatus.classList.remove("invalid");
+                    urlStatus.classList.add("valid");
+                    urlStatus.textContent = "✓ " + data.message;
+                    validationIcon.textContent = "✓";
+                    validationIcon.style.color = "#28a745";
+                } else {
+                    urlStatus.classList.remove("valid");
+                    urlStatus.classList.add("invalid");
+                    urlStatus.textContent = "✗ " + data.message;
+                    validationIcon.textContent = "✗";
+                    validationIcon.style.color = "#dc3545";
+                }
+            } catch (error) {
+                console.error("Validation error:", error);
+            }
+        }
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            await scrapeComments();
+        });
+
+        async function scrapeComments() {
+            const url = videoUrlInput.value.trim();
+            const maxComments = parseInt(maxCommentsInput.value);
+            const exportFormat = exportFormatSelect.value;
+
+            if (!url) {
+                showError("Please enter a TikTok video URL");
+                return;
+            }
+
+            scrapeBtn.disabled = true;
+            loading.style.display = "block";
+            results.style.display = "none";
+            errorMessage.style.display = "none";
+            successMessage.style.display = "none";
+
+            try {
+                const response = await fetch("/api/scrape", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        video_url: url,
+                        max_comments: maxComments,
+                        export_format: exportFormat
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    lastExportFile = data.export_file;
+                    displayResults(data);
+                    loadExports();
+                    showSuccess(`Successfully scraped ${data.total_comments} comments!`);
+                } else {
+                    showError(data.error || "Failed to scrape comments");
+                }
+            } catch (error) {
+                showError("Error: " + error.message);
+            } finally {
+                scrapeBtn.disabled = false;
+                loading.style.display = "none";
+            }
+        }
+
+        function displayResults(data) {
+            const { summary, metadata } = data;
+
+            statsGrid.innerHTML = `
+                <div class="stat-box">
+                    <div class="label">Total Comments</div>
+                    <div class="value">${summary.total_comments}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Total Likes</div>
+                    <div class="value">${summary.total_likes}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Total Replies</div>
+                    <div class="value">${summary.total_replies}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Avg Likes</div>
+                    <div class="value">${summary.avg_likes.toFixed(1)}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Avg Replies</div>
+                    <div class="value">${summary.avg_replies.toFixed(1)}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Verified Users</div>
+                    <div class="value">${summary.verified_users}</div>
+                </div>
+            `;
+
+            results.style.display = "block";
+        }
+
+        downloadBtn.addEventListener("click", () => {
+            if (lastExportFile) {
+                window.location.href = `/api/download/${lastExportFile}`;
+            }
+        });
+
+        async function loadExports() {
+            try {
+                const response = await fetch("/api/exports");
+                const data = await response.json();
+
+                fileList.innerHTML = data.files.map(file => `
+                    <div class="file-item">
+                        <div class="info">
+                            <div class="name">${file.name}</div>
+                            <div class="size">${formatFileSize(file.size)}</div>
+                        </div>
+                        <button type="button" class="btn-secondary" onclick="downloadFile('${file.name}')">
+                            Download
+                        </button>
+                    </div>
+                `).join("");
+            } catch (error) {
+                console.error("Error loading exports:", error);
+            }
+        }
+
+        function downloadFile(filename) {
+            window.location.href = `/api/download/${filename}`;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return "0 Bytes";
+            const k = 1024;
+            const sizes = ["Bytes", "KB", "MB"];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = "block";
+        }
+
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = "block";
+            setTimeout(() => {
+                successMessage.style.display = "none";
+            }, 5000);
+        }
+
+        loadExports();
+    </script>
+</body>
+</html>
