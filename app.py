@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import aiofiles
+import re
 
 from scraper import TikTokCommentScraper
 from exporter import DataExporter
@@ -57,8 +58,10 @@ scraping_status = {
 
 class ScrapeRequest(BaseModel):
     video_url: str = Field(..., description="TikTok video URL")
-    max_comments: int = Field(200, ge=1, le=10000, description="Maximum comments to scrape")
-    export_format: str = Field("json", description="Export format: json, csv, or excel")
+    max_comments: int = Field(
+        200, ge=1, le=10000, description="Maximum comments to scrape")
+    export_format: str = Field(
+        "json", description="Export format: json, csv, or excel")
 
 
 class ValidateURLRequest(BaseModel):
@@ -106,6 +109,17 @@ async def root():
         """
 
 
+def extract_tiktok_id(url):
+    # Regex pattern to match the 19-digit video ID in a TikTok URL
+    pattern = r'/video/(\d+)'
+
+    match = re.search(pattern, url)
+    if match:
+        return match.group(1)
+    else:
+        return "ID not found in the URL"
+
+
 @app.post("/api/scrape", response_model=ScrapeResponse)
 async def api_scrape(request: ScrapeRequest):
     try:
@@ -114,10 +128,12 @@ async def api_scrape(request: ScrapeRequest):
         export_format = request.export_format
 
         if not video_url:
-            raise HTTPException(status_code=400, detail="Video URL is required")
+            raise HTTPException(
+                status_code=400, detail="Video URL is required")
 
         if not scraper.validate_url(video_url):
-            raise HTTPException(status_code=400, detail="Invalid TikTok URL format")
+            raise HTTPException(
+                status_code=400, detail="Invalid TikTok URL format")
 
         if export_format not in Config.EXPORT_FORMATS:
             raise HTTPException(
@@ -131,13 +147,14 @@ async def api_scrape(request: ScrapeRequest):
 
         try:
             comments, metadata = await scraper.scrape_comments(video_url, max_comments)
+            video_id = extract_tiktok_id(request.video_url)
 
             if export_format == "json":
-                export_path = exporter.to_json(comments)
+                export_path = exporter.to_json(comments, f"{video_id}.json")
             elif export_format == "csv":
-                export_path = exporter.to_csv(comments)
+                export_path = exporter.to_csv(comments, f"{video_id}.json")
             elif export_format == "excel":
-                export_path = exporter.to_excel(comments)
+                export_path = exporter.to_excel(comments, f"{video_id}.json")
 
             summary_data = exporter.get_export_summary(comments)
             summary = ExportSummary(**summary_data)
@@ -181,7 +198,8 @@ async def api_list_exports():
                     files.append(FileInfo(
                         name=filename,
                         size=os.path.getsize(filepath),
-                        modified=datetime.fromtimestamp(os.path.getmtime(filepath)).isoformat()
+                        modified=datetime.fromtimestamp(
+                            os.path.getmtime(filepath)).isoformat()
                     ))
         return {"files": files}
     except Exception as e:

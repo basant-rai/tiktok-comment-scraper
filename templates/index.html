@@ -479,13 +479,13 @@
                     urlStatus.classList.add("valid");
                     urlStatus.textContent = "✓ " + data.message;
                     validationIcon.textContent = "✓";
-                    validationIcon.style.color = var(--success);
+                    // validationIcon.style.color = var(--success);
                 } else {
                     urlStatus.classList.remove("valid");
                     urlStatus.classList.add("invalid");
                     urlStatus.textContent = "✗ " + data.message;
                     validationIcon.textContent = "✗";
-                    validationIcon.style.color = var(--error);
+                    // validationIcon.style.color = var(--error);
                 }
             } catch (error) {
                 console.error("Validation error:", error);
