@@ -1,8 +1,12 @@
+from typing import Dict, Any
+from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException
 import asyncio
 import logging
 import os
+import json
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -228,6 +232,52 @@ async def api_download(filename: str):
     except Exception as e:
         logger.error(f"Download error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/comments/{video_id}")
+async def get_comments_from_file(video_id: str) -> Dict[str, Any]:
+    """
+    Check if comments file exists for this video_id.
+    If yes, return the data. If no, return status indicating need to scrape.
+    """
+    try:
+        # Construct the expected filename
+        filename = f"{video_id}.json"
+        filepath = os.path.join(Config.OUTPUT_DIR, filename)
+
+        # Debug logging
+        print(f"🔍 Checking for file: {filepath}")
+        print(f"📁 OUTPUT_DIR: {Config.OUTPUT_DIR}")
+        print(f"📄 File exists: {os.path.exists(filepath)}")
+
+        # Check if file exists
+        if os.path.exists(filepath) and os.path.isfile(filepath):
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            return {
+                "status": "found",
+                "data": data,
+                "filename": filename
+            }
+        else:
+            # Return 200 with not_found status instead of throwing 404
+            return {
+                "status": "not_found",
+                "message": "No cached comments found. Please scrape first.",
+                "video_id": video_id
+            }
+
+    except json.JSONDecodeError as e:
+        print(f"❌ JSON decode error: {e}")
+        raise HTTPException(
+            status_code=500, detail="Invalid JSON format in file")
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, detail=f"Error reading file: {str(e)}")
 
 
 @app.post("/api/validate-url")
