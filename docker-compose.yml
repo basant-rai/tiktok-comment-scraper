@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  tiktok-scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+      - /app/__pycache__
+      - /app/.pytest_cache
+    environment:
+      - DEBUG=True
+      - HOST=0.0.0.0
+      - PORT=5000
+      - OUTPUT_DIR=exports
+      - LOGS_DIR=logs
+      - MS_TOKEN=${MS_TOKEN:-}
+      - HEADLESS=True
+    command: |
+      sh -c "pip install watchfiles && python -m uvicorn app:app --host 0.0.0.0 --port 5000 --reload"
+    depends_on:
+      - setup-dirs
+    networks:
+      - tiktok-network
+
+  setup-dirs:
+    image: alpine:latest
+    volumes:
+      - ./exports:/app/exports
+      - ./logs:/app/logs
+    command: sh -c "mkdir -p /app/exports /app/logs && chmod 777 /app/exports /app/logs"
+    networks:
+      - tiktok-network
+
+networks:
+  tiktok-network:
+    driver: bridge
