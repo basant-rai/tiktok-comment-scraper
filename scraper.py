@@ -1,10 +1,14 @@
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime
 from typing import List, Dict, Optional, AsyncIterator
 from TikTokApi import TikTokApi
+from dotenv import load_dotenv
 import re
+
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,10 +22,20 @@ logger = logging.getLogger(__name__)
 
 
 class TikTokCommentScraper:
-    def __init__(self, headless=True, max_retries=3):
+    def __init__(self, headless=True, max_retries=3, ms_token=None, attempt_timeout=180):
         self.headless = headless
         self.max_retries = max_retries
         self.session_count = 1
+        self.ms_token = ms_token or os.getenv("MS_TOKEN") or None
+        self.attempt_timeout = attempt_timeout
+
+    def _session_strategies(self) -> List[Dict]:
+        strategies = [{"browser": "chromium", "headless": True}]
+        # A visible browser window is the hardest to detect, but needs a display
+        if os.name == "nt" or os.environ.get("DISPLAY"):
+            strategies.append({"browser": "chromium", "headless": False})
+        strategies.append({"browser": "firefox", "headless": True})
+        return strategies
 
     def extract_video_id(self, url: str) -> Optional[str]:
         patterns = [
@@ -56,42 +70,30 @@ class TikTokCommentScraper:
             "errors": [],
         }
 
+        strategies = self._session_strategies()
+
         for attempt in range(self.max_retries):
+            strategy = strategies[attempt % len(strategies)]
             try:
-                logger.info(f"Attempt {attempt + 1}/{self.max_retries}: Scraping {video_url}")
+                logger.info(
+                    f"Attempt {attempt + 1}/{self.max_retries}: Scraping {video_url} "
+                    f"(browser={strategy['browser']}, headless={strategy['headless']}, "
+                    f"ms_token={'set' if self.ms_token else 'not set'})"
+                )
 
-                async with TikTokApi() as api:
-                    await api.create_sessions(
-                        num_sessions=self.session_count,
-                        sleep_after=2,
-                        headless=self.headless
-                    )
+                # Hard cap per attempt: a crashed/hung browser must not stall the retry loop
+                all_comments = await asyncio.wait_for(
+                    self._scrape_once(video_url, max_comments, filters, strategy),
+                    timeout=self.attempt_timeout,
+                )
 
-                    video = api.video(url=video_url)
-                    count = 0
-
-                    async for comment in video.comments(count=max_comments):
-                        try:
-                            data = comment.as_dict
-
-                            entry = self._parse_comment(data)
-
-                            if self._apply_filters(entry, filters):
-                                all_comments.append(entry)
-                                count += 1
-                                logger.info(f"[{count}] @{entry['username']}: {entry['text'][:50]}")
-
-                        except Exception as e:
-                            logger.warning(f"Error parsing comment: {e}")
-                            continue
-
-                    metadata["status"] = "success"
-                    metadata["total_comments"] = count
-                    logger.info(f"Successfully scraped {count} comments")
-                    return all_comments, metadata
+                metadata["status"] = "success"
+                metadata["total_comments"] = len(all_comments)
+                logger.info(f"Successfully scraped {len(all_comments)} comments")
+                return all_comments, metadata
 
             except Exception as e:
-                error_msg = f"Attempt {attempt + 1} failed: {str(e)}"
+                error_msg = f"Attempt {attempt + 1} failed: {str(e) or type(e).__name__}"
                 logger.error(error_msg)
                 metadata["errors"].append(error_msg)
 
@@ -104,6 +106,44 @@ class TikTokCommentScraper:
         metadata["status"] = "failed"
         logger.error(f"Failed to scrape comments after {self.max_retries} attempts")
         return all_comments, metadata
+
+    async def _scrape_once(
+        self,
+        video_url: str,
+        max_comments: int,
+        filters: Optional[Dict],
+        strategy: Dict
+    ) -> List[Dict]:
+        comments = []
+
+        async with TikTokApi() as api:
+            await api.create_sessions(
+                num_sessions=self.session_count,
+                sleep_after=3,
+                ms_tokens=[self.ms_token] if self.ms_token else None,
+                browser=strategy["browser"],
+                headless=strategy["headless"],
+                suppress_resource_load_types=["image", "media", "font"],
+            )
+
+            video = api.video(url=video_url)
+
+            async for comment in video.comments(count=max_comments):
+                try:
+                    entry = self._parse_comment(comment.as_dict)
+
+                    if self._apply_filters(entry, filters):
+                        comments.append(entry)
+                        logger.info(f"[{len(comments)}] @{entry['username']}: {entry['text'][:50]}")
+
+                        if len(comments) >= max_comments:
+                            break
+
+                except Exception as e:
+                    logger.warning(f"Error parsing comment: {e}")
+                    continue
+
+        return comments
 
     def _parse_comment(self, data: Dict) -> Dict:
         return {

@@ -156,9 +156,9 @@ async def api_scrape(request: ScrapeRequest):
             if export_format == "json":
                 export_path = exporter.to_json(comments, f"{video_id}.json")
             elif export_format == "csv":
-                export_path = exporter.to_csv(comments, f"{video_id}.json")
+                export_path = exporter.to_csv(comments, f"{video_id}.csv")
             elif export_format == "excel":
-                export_path = exporter.to_excel(comments, f"{video_id}.json")
+                export_path = exporter.to_excel(comments, f"{video_id}.xlsx")
 
             summary_data = exporter.get_export_summary(comments)
             summary = ExportSummary(**summary_data)
