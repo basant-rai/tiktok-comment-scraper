@@ -2,7 +2,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for Playwright browsers
+# Copy requirements first (for better caching)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Playwright browsers
+RUN playwright install chromium firefox
+
+# Install system dependencies for Playwright (Ubuntu compatible)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libnss3 \
     libnspr4 \
@@ -26,23 +33,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libx11-xcb1 \
     libxcursor1 \
     libgtk-3-0 \
-    libgdk-3-0 \
+    libgdk-pixbuf2.0-0 \
     libpangocairo-1.0-0 \
     libpango-1.0-0 \
-    libcairo-gobject2 \
     libcairo2 \
-    libgdk-pixbuf-2.0-0 \
     libasound2 \
     libfreetype6 \
     libfontconfig1 \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install Playwright browsers
-RUN playwright install chromium firefox
 
 # Copy application code
 COPY . .
