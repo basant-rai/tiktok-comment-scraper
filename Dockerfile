@@ -21,6 +21,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxcb1 \
     libxau6 \
     libxdmcp6 \
+    libexpat1 \
+    libxcb-shm0 \
+    libx11-xcb1 \
+    libxcursor1 \
+    libgtk-3-0 \
+    libgdk-3-0 \
+    libpangocairo-1.0-0 \
+    libpango-1.0-0 \
+    libcairo-gobject2 \
+    libcairo2 \
+    libgdk-pixbuf-2.0-0 \
+    libasound2 \
+    libfreetype6 \
+    libfontconfig1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
