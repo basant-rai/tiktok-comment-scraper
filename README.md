@@ -73,6 +73,7 @@ LOGS_DIR=logs
 ```bash
 # Start the application
 python app.py
+uvicorn app.main:app --reload
 ```
 
 The web interface will be available at `http://localhost:5000`

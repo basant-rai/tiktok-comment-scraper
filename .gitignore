@@ -3,7 +3,12 @@ venv/
 env/
 ENV/
 .venv
-
+EDGE-CASES.md
+DEPLOYMENT-GUIDE.md
+SETUP-SUMMARY.md
+DEPLOYMENT.md
+.claude*
+API.md
 # Python
 __pycache__/
 *.py[cod]

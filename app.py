@@ -61,11 +61,13 @@ scraping_status = {
 
 
 class ScrapeRequest(BaseModel):
-    video_url: str = Field(..., description="TikTok video URL")
+    video_url: str = Field(..., description="TikTok post URL (video, photo, or short link)")
     max_comments: int = Field(
         200, ge=1, le=10000, description="Maximum comments to scrape")
     export_format: str = Field(
         "json", description="Export format: json, csv, or excel")
+    include_replies: bool = Field(
+        False, description="Fetch replies to each comment")
 
 
 class ValidateURLRequest(BaseModel):
@@ -114,14 +116,18 @@ async def root():
 
 
 def extract_tiktok_id(url):
-    # Regex pattern to match the 19-digit video ID in a TikTok URL
-    pattern = r'/video/(\d+)'
+    """Extract post ID from TikTok URL (video, photo, or short link)."""
+    patterns = [
+        r"(?:vm|vt|v)\.tiktok\.com/(\w+)",  # Short links
+        r"tiktok\.com/@[\w.-]+/(?:video|photo)/(\d+)",  # Long links
+    ]
 
-    match = re.search(pattern, url)
-    if match:
-        return match.group(1)
-    else:
-        return "ID not found in the URL"
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+
+    return "ID not found in the URL"
 
 
 @app.post("/api/scrape", response_model=ScrapeResponse)
@@ -150,7 +156,9 @@ async def api_scrape(request: ScrapeRequest):
         scraping_status["error"] = None
 
         try:
-            comments, metadata = await scraper.scrape_comments(video_url, max_comments)
+            comments, metadata = await scraper.scrape_comments(
+                video_url, max_comments, include_replies=request.include_replies
+            )
             video_id = extract_tiktok_id(request.video_url)
 
             if export_format == "json":
@@ -286,11 +294,13 @@ async def api_validate_url(request: ValidateURLRequest):
         url = request.url.strip()
 
         is_valid = scraper.validate_url(url)
-        video_id = scraper.extract_video_id(url) if is_valid else None
+        post_id = scraper.extract_post_id(url) if is_valid else None
+        post_type = scraper.get_post_type(url) if is_valid else None
 
         return {
             "valid": is_valid,
-            "video_id": video_id,
+            "post_id": post_id,
+            "post_type": post_type,
             "message": "Valid TikTok URL" if is_valid else "Invalid TikTok URL format"
         }
 
